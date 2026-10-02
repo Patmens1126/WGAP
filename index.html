@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>WGAP Portal | Women's Growth Finance Ghana</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css"></head>
+<body>
+<div class="auth">
+  <aside class="auth-art">
+    <div class="brand"><span class="mark">W</span><div><b>Women's Growth Finance Ghana</b><small>WGFG</small></div></div>
+    <div><h1>Grow your business with the Access Programme</h1>
+      <p>Apply online for a collateral-free loan under the Women's Growth Access Programme (WGAP), Ablekuma Central.</p></div>
+    <div class="facts"><div><b>GHS 2,000–10,000</b><span>Loan range</span></div><div><b>4 months</b><span>Maximum period</span></div><div><b>No collateral</b><span>Repay principal only</span></div></div>
+  </aside>
+  <section class="auth-form"><div class="card">
+    <h2 id="ttl">Welcome back</h2><p style="color:var(--mut);margin:6px 0 0">Applicants and administrators sign in here.</p>
+    <div class="tabs"><button id="t1" class="on" type="button">Sign in</button><button id="t2" type="button">Create account</button></div>
+    <form id="f" novalidate>
+      <div class="field" id="nmw" hidden><label>Full name</label><input id="nm" type="text" autocomplete="name"></div>
+      <div class="field"><label>Phone number</label><input id="ph" type="tel" autocomplete="tel" inputmode="tel" placeholder="0244123456"></div>
+      <div class="field"><label>Email</label><input id="em" type="email" autocomplete="username"></div>
+      <div class="field"><label>Password</label><input id="pw" type="password" autocomplete="current-password"></div>
+      <div class="msg" id="msg"></div>
+      <button class="btn" id="go" style="width:100%">Sign in</button>
+    </form>
+  </div></section>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script><script src="js/questions.js"></script><script src="js/app.js"></script>
+<script>
+let mode='in';
+const setMode=m=>{mode=m;$('#t1').classList.toggle('on',m==='in');$('#t2').classList.toggle('on',m==='up');$('#nmw').hidden=m==='in';$('#go').textContent=m==='in'?'Sign in':'Create account';$('#ttl').textContent=m==='in'?'Welcome back':'Start your application';$('#msg').textContent=''};
+$('#t1').onclick=()=>setMode('in');$('#t2').onclick=()=>setMode('up');
+const friendly=e=>/confirm/i.test(e.message)?'Account not activated yet. Ask the administrator to run supabase/update_v2.sql (or turn off Confirm email in Supabase).':e.message;
+async function route(){const p=await me();if(p)location.href=p.role==='admin'?'admin.html':'apply.html'}
+$('#f').onsubmit=async e=>{
+  e.preventDefault();const em=$('#em').value.trim(),pw=$('#pw').value,nm=$('#nm').value.trim(),ph=$('#ph').value.trim(),msg=$('#msg');msg.textContent='';
+  if(!em||pw.length<6)return msg.textContent='Enter your email and a password of at least 6 characters.';
+  if(mode==='up'&&!ph)return msg.textContent='Enter your phone number to create an account.';
+  $('#go').disabled=true;
+  if(mode==='up'){
+    if(nm.split(/\s+/).length<2){$('#go').disabled=false;return msg.textContent='Enter your full name (first and last).'}
+    const {data,error}=await sb.auth.signUp({email:em,password:pw,options:{data:{full_name:nm,phone:ph}}});
+    if(error){$('#go').disabled=false;return msg.textContent=friendly(error)}
+    if(!data.session){const r=await sb.auth.signInWithPassword({email:em,password:pw});if(r.error){$('#go').disabled=false;return msg.textContent=friendly(r.error)}}
+  }else{
+    const {error}=await sb.auth.signInWithPassword({email:em,password:pw});
+    if(error){$('#go').disabled=false;return msg.textContent=friendly(error)}
+  }
+  route();
+};
+route();
+</script></body></html>

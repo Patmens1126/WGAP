@@ -1,0 +1,55 @@
+// Single source of truth: drives the form, the admin view and the printed PDF.
+const REGIONS=['Greater Accra','Ashanti','Central','Eastern','Western','Western North','Volta','Oti','Northern','Savannah','North East','Upper East','Upper West','Bono','Bono East','Ahafo'];
+const YN=['Yes','No'];
+const WGAP_FORM=[
+{key:'A',title:'Personal Information',hint:'Details exactly as they appear on your ID.',fields:[
+ {n:1,id:'fullName',label:'Full name (as on ID)',type:'text',full:1},
+ {n:2,id:'gender',label:'Gender',type:'choice',options:['Female','Male','Other'],other:1},
+ {n:3,id:'dob',label:'Date of birth',type:'date'},
+ {n:4,id:'marital',label:'Marital status',type:'choice',options:['Single','Married','Divorced','Widowed','Separated'],full:1},
+ {n:5,id:'education',label:'Education',type:'choice',options:['No formal','Basic / JHS','SHS / Vocational','Tertiary','Other'],other:1,full:1},
+ {n:6,id:'disability',label:'Disability status',type:'choice',options:['No','Yes'],follow:{when:'Yes',id:'disabilityDetail',label:'Please specify'}},
+ {n:7,id:'breadwinner',label:'Sole breadwinner of the household?',type:'choice',options:YN},
+ {n:8,id:'children',label:'Children under 3 years?',type:'choice',options:YN,follow:{when:'Yes',id:'childrenCount',label:'How many?',type:'number'}},
+ {n:9,id:'idType',label:'ID type',type:'choice',options:['Ghana Card','Voter ID','Passport',"Driver's Licence",'Other'],other:1,full:1},
+ {n:10,id:'idNo',label:'ID number',type:'text'},
+ {n:11,id:'momo',label:'Mobile (MoMo)',type:'tel'},
+ {n:'',id:'altPhone',label:'Alternative number',type:'tel',optional:1},
+ {n:12,id:'region',label:'Region',type:'select',options:REGIONS},
+ {n:'',id:'district',label:'District / Municipal',type:'text'},
+ {n:13,id:'town',label:'Town / Suburb',type:'text'},
+ {n:14,id:'address',label:'Residential address / Landmark',type:'text'},
+ {n:15,id:'postal',label:'Postal address',type:'text',optional:1},
+ {n:'',id:'gps',label:'GPS address',type:'text',optional:1},
+ {n:16,id:'electoral',label:'Electoral area / Community (Ablekuma Central)',type:'text',full:1}]},
+{key:'B',title:'Business Information',hint:'Tell us about the business you run.',fields:[
+ {n:17,id:'bizName',label:'Name of business',type:'text',full:1},
+ {n:18,id:'bizRegion',label:'Business region',type:'select',options:REGIONS},
+ {n:'',id:'bizDistrict',label:'District / Municipal',type:'text'},
+ {n:19,id:'bizTown',label:'Business town / Suburb',type:'text'},
+ {n:20,id:'bizAddress',label:'Business address / Market / Shop',type:'text'},
+ {n:21,id:'bizPhone',label:'Business telephone',type:'tel'},
+ {n:22,id:'sector',label:'Sector',type:'choice',options:['Trading','Food / Catering','Fashion','Beauty','Agro-processing','Manufacturing','Services','Other'],other:1,full:1},
+ {n:23,id:'bizDesc',label:'Description of business',type:'textarea',full:1},
+ {n:24,label:'Age of business',type:'group',group:[{id:'ageYears',label:'Years',max:80},{id:'ageMonths',label:'Months',max:11}]},
+ {n:25,id:'registered',label:'Registered with the Office of the Registrar of Companies?',type:'choice',options:YN,follow:{when:'Yes',id:'regNo',label:'Registration No.',type:'text'}},
+ {n:26,id:'ownership',label:'Ownership',type:'choice',options:['Sole proprietorship','Partnership','Limited liability','Other'],other:1,full:1},
+ {n:27,id:'owners',label:'Owner(s)',type:'text',full:1},
+ {n:28,label:'Employees (including yourself)',type:'group',full:1,group:[{id:'empPaid',label:'Paid'},{id:'empUnpaid',label:'Unpaid / family'},{id:'empTotal',label:'Total',calc:1}]},
+ {n:29,id:'weeklySales',label:'Estimated weekly / monthly sales (GHS)',type:'number'},
+ {n:30,id:'prevSupport',label:'Previous support (loan, grant or training)?',type:'choice',options:YN,follow:{when:'Yes',id:'prevDetail',label:'Details'}},
+ {n:31,id:'assoc',label:'Member of a business association?',type:'choice',options:YN,follow:{when:'Yes',id:'assocName',label:'Name of association'}},
+ {n:32,id:'joinWGFG',label:'Wish to join the WGFG Women Entrepreneurs Association?',type:'choice',options:YN}]},
+{key:'C',title:'Loan Request',hint:'Collateral-free loans of GHS 2,000 to 10,000.',fields:[
+ {n:33,id:'amount',label:'Amount requested (GHS 2,000 – 10,000)',type:'number',min:2000,max:10000},
+ {n:34,id:'purpose',label:'Purpose of loan',type:'textarea',full:1},
+ {n:35,label:'Preferred repayment period',type:'group',group:[{id:'period',label:'Months (max. 4)',min:1,max:4}]},
+ {n:'',id:'frequency',label:'Repayment frequency',type:'choice',options:['Weekly','Bi-weekly','Monthly']},
+ {n:36,id:'heardFrom',label:'How did you hear about this programme?',type:'choice',options:['Radio','Flyer','WhatsApp','Market','Assembly','Friend','Other'],other:1,full:1}]},
+{key:'D',title:'Declaration and Signature',hint:'Read carefully before you submit.',
+ intro:'I declare that the information given is true and complete. I understand that this is a collateral-free loan under the Women\u2019s Growth Access Programme and that I will repay only the principal disbursed. I agree to short business support sessions and monitoring visits. I authorise WGFG to verify this information and to use my data for programme administration and reporting in line with applicable law.',
+ fields:[
+ {n:'',id:'declAgree',label:'I have read and agree to the declaration above.',type:'agree',full:1},
+ {n:'',id:'signName',label:'Applicant\u2019s full name (typed as signature)',type:'text'},
+ {n:'',id:'witnessName',label:'Witness name (optional)',type:'text',optional:1}]}
+];

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Loan Application | WGAP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css"></head>
+<body><div id="top"></div>
+<main id="main"></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script><script src="js/questions.js"></script><script src="js/app.js"></script>
+<script>
+let P,REF,APP,cur=0;
+(async()=>{
+  P=await me();if(!P)return location.href='index.html';if(P.role==='admin')return location.href='admin.html';
+  const r=await sb.rpc('assign_ref');REF=r.data||P.ref_no;
+  $('#top').innerHTML=topbar(P,`<span class="refbadge">Reference <b>${esc(REF)}</b></span>`);
+  const {data}=await sb.from('applications').select('*').eq('user_id',P.id).maybeSingle();
+  APP=data;APP?done():formView();
+})();
+function done(){
+  $('#main').innerHTML=`<div class="card"><div class="success"><div class="ring">✓</div><h1>Application submitted</h1>
+  <p style="color:var(--mut)">Thank you, ${esc(P.full_name)}. Quote your reference <b>${esc(APP.ref_no)}</b> when contacting WGFG.</p>
+  ${APP.sms_status==='sent'?'<p>A confirmation SMS has been sent to your phone.</p>':''}<button class="btn gold" onclick='printApps([APP])'>Print my copy</button></div>${answersHTML(APP.data,true)}</div>`;
+}
+function formView(){
+  $('#main').innerHTML=`<div class="hero"><div><h1>Loan Application Form</h1><p>Women's Growth Access Programme · Complete all four sections.</p></div></div>
+  <div class="steps" id="steps">${WGAP_FORM.map((s,i)=>`<div class="pill"><i>${s.key}</i><span>${s.title}</span></div>`).join('')}</div>
+  <div class="bar"><span id="bar"></span></div>
+  <form class="card" id="form" novalidate></form>`;
+  const form=$('#form');buildForm(form,{fullName:P.full_name,signName:P.full_name});
+  form.insertAdjacentHTML('beforeend',`<div class="nav"><button type="button" class="btn ghost" id="back">Back</button><button type="button" class="btn" id="next">Continue</button></div>`);
+  const S=$$('.step',form);
+  const show=i=>{cur=i;S.forEach((s,k)=>s.hidden=k!==i);$$('.pill').forEach((p,k)=>{p.classList.toggle('on',k===i);p.classList.toggle('done',k<i)});
+    $('#bar').style.width=((i+1)/S.length*100)+'%';$('#back').style.visibility=i?'visible':'hidden';$('#next').textContent=i===S.length-1?'Submit application':'Continue';scrollTo({top:0})};
+  const ok=i=>{for(const x of $$('input,select,textarea',S[i]).filter(x=>!x.disabled)){if(!x.checkValidity()){x.reportValidity();return false}}return true};
+  $('#back').onclick=()=>show(cur-1);
+  $('#next').onclick=async()=>{
+    if(!ok(cur))return;if(cur<S.length-1)return show(cur+1);
+    const d=collect(form);$('#next').disabled=true;
+    const {data,error}=await sb.from('applications').insert({user_id:P.id,ref_no:REF,full_name:d.fullName,data:d}).select().single();
+    if(error){$('#next').disabled=false;return toast(error.message,1)}
+    APP=data;done();scrollTo({top:0});
+
+    const [smsRes,emailRes]=await Promise.all([
+      sb.functions.invoke('send-sms',{body:{application_id:data.id}}),
+      sb.functions.invoke('send-email',{body:{application_id:data.id}})
+    ]);
+
+    const smsOk=!smsRes.error&&smsRes.data&&smsRes.data.ok;
+    const emailOk=!emailRes.error&&emailRes.data&&emailRes.data.ok;
+    APP.sms_status=smsOk?'sent':'failed';
+    APP.email_status=emailOk?'sent':'failed';
+    done();
+    toast(
+      smsOk && emailOk ? `Application submitted and confirmation email/SMS were sent.` :
+      smsOk ? `Application submitted. SMS was sent, but email delivery could not be completed.` :
+      emailOk ? `Application submitted. Email sent, but SMS delivery could not be completed.` :
+      'Application saved successfully. SMS and email notifications could not be sent.',
+      !(smsOk || emailOk)
+    );
+  };
+  show(0);
+}
+</script></body></html>

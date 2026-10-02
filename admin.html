@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Admin | WGAP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css"></head>
+<body><div id="top"></div>
+<main>
+  <div class="hero"><div><h1>Applications</h1><p>Review applicant profiles and their submitted loan forms.</p></div>
+  <button class="btn gold" id="printAll">Print all responses</button></div>
+  <div class="stats"><div class="stat"><b id="s1">0</b><span>Applications received</span></div><div class="stat"><b id="s2">0</b><span>Registered applicants</span></div><div class="stat"><b id="s3">0</b><span>GHS requested in total</span></div></div>
+  <div class="card"><div class="tools"><input id="q" type="text" placeholder="Search by name, profile, email, reference, business or phone"></div>
+  <div class="tablewrap"><table class="list"><thead><tr><th>Ref</th><th>Applicant</th><th>Profile</th><th>Email</th><th>Business</th><th>Phone</th><th>Amount (GHS)</th><th>SMS</th><th>Submitted</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>
+</main>
+<dialog id="dlg"><div class="dhead"><b id="dt"></b><span><button class="btn gold sm" id="dp">Print</button> <button class="btn ghost sm" id="dc">Close</button></span></div><div class="dbody card" id="db" style="border:0;box-shadow:none"></div></dialog>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script><script src="js/questions.js"></script><script src="js/app.js"></script>
+<script>
+let ALL=[],VIEW=[],open=null;
+(async()=>{
+  const P=await me();if(!P||P.role!=='admin')return location.href='index.html';
+  $('#top').innerHTML=topbar(P);
+  const [a,u]=await Promise.all([
+    sb.from('applications').select('*, profiles!applications_user_id_fkey(*)').order('ref_no'),
+    sb.from('profiles').select('id',{count:'exact',head:true}).eq('role','applicant')
+  ]);
+  if(a.error)return toast(a.error.message,1);
+  ALL=(a.data||[]).map(app=>({ ...app, profile: app.profiles || null })).sort((x,y)=>parseInt(x.ref_no)-parseInt(y.ref_no));
+  $('#s1').textContent=ALL.length;$('#s2').textContent=u.count??0;
+  $('#s3').textContent=ALL.reduce((s,x)=>s+(+x.data.amount||0),0).toLocaleString();draw();
+})();
+function applicantString(a){const name=a.profile?.full_name||a.full_name||'Applicant';const email=a.profile?.email||'—';return [name,email].join(' ')}
+function draw(){
+  const q=$('#q').value.toLowerCase();
+  VIEW=ALL.filter(a=>[a.ref_no,a.full_name,a.profile?.full_name||'',a.profile?.email||'',a.data.bizName,a.data.momo].join(' ').toLowerCase().includes(q));
+  const sms=a=>a.sms_status==='sent'?'<span style="color:var(--ok);font-weight:700">Sent</span>':`<button class="btn ghost sm" onclick="resend('${a.id}')">${a.sms_status==='failed'?'Retry SMS':'Send SMS'}</button>`;
+  $('#rows').innerHTML=VIEW.length?VIEW.map(a=>`<tr><td data-l="Ref"><span class="tag">${esc(a.ref_no)}</span></td><td data-l="Applicant"><b>${esc(a.profile?.full_name || a.full_name)}</b></td><td data-l="Profile">${esc(a.profile?.role || 'applicant')}</td><td data-l="Email">${esc(a.profile?.email || '—')}</td><td data-l="Business">${esc(a.data.bizName)}</td><td data-l="Phone">${esc(a.data.momo)}</td><td data-l="Amount (GHS)">${(+a.data.amount||0).toLocaleString()}</td><td data-l="SMS">${sms(a)}</td><td data-l="Submitted">${new Date(a.created_at).toLocaleDateString('en-GB')}</td>
+  <td class="act" style="white-space:nowrap"><button class="btn ghost sm" onclick="view('${a.id}')">View</button> <button class="btn ghost sm" onclick="printApps([ALL.find(x=>x.id==='${a.id}')])">Print</button></td></tr>`).join(''):'<tr><td colspan="10" class="empty">No applications found.</td></tr>';
+}
+async function resend(id){
+  const r=await sb.functions.invoke('send-sms',{body:{application_id:id}});
+  const ok=!r.error&&r.data&&r.data.ok;toast(ok?'SMS sent':'SMS failed. Check the Arkesel key and balance.',!ok);
+  const a=await sb.from('applications').select('sms_status').eq('id',id).single();ALL.find(x=>x.id===id).sms_status=a.data?.sms_status;draw();
+}
+function view(id){
+  open=ALL.find(a=>a.id===id);
+  const p=open.profile || {};
+  $('#dt').textContent=`${open.ref_no} · ${p.full_name || open.full_name}`;
+  $('#db').innerHTML=`<div class="profile-box"><h3>Applicant profile</h3><table class="ans"><tr><td class="l">Full name</td><td class="v">${esc(p.full_name || open.full_name)}</td></tr><tr><td class="l">Email</td><td class="v">${esc(p.email || '—')}</td></tr><tr><td class="l">Role</td><td class="v">${esc(p.role || 'applicant')}</td></tr><tr><td class="l">Reference</td><td class="v">${esc(p.ref_no || open.ref_no)}</td></tr><tr><td class="l">Member since</td><td class="v">${p.created_at ? new Date(p.created_at).toLocaleDateString('en-GB') : new Date(open.created_at).toLocaleDateString('en-GB')}</td></tr></table></div>${answersHTML(open.data,true)}`;
+  $('#dlg').showModal();
+}
+$('#q').oninput=draw;$('#dc').onclick=()=>$('#dlg').close();$('#dp').onclick=()=>{$('#dlg').close();printApps([open])};
+$('#printAll').onclick=()=>VIEW.length?printApps(VIEW):toast('Nothing to print yet.',1);
+</script></body></html>
