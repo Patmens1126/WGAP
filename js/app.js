@@ -4,20 +4,111 @@ const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+const WGAP_ACCESS_KEY='wgap_applicant_access';
+
+function loadApplicantAccess(){
+  try{const raw=localStorage.getItem(WGAP_ACCESS_KEY);return raw?JSON.parse(raw):null;}catch{return null;}
+}
+function saveApplicantAccess(info){localStorage.setItem(WGAP_ACCESS_KEY,JSON.stringify(info));}
+function clearApplicantAccess(){localStorage.removeItem(WGAP_ACCESS_KEY);}
+function applicantCredentials(fullName,phone){
+  const digits=(phone||'').replace(/\D/g,'');
+  const slug=(fullName||'applicant').toLowerCase().replace(/[^a-z0-9]+/g,'.').replace(/^\.|\.$/g,'').slice(0,18)||'applicant';
+  const suffix=digits||'0000';
+  return {email:`${slug}.${suffix}@wgap.local`,password:`Wgap-${suffix}!`};
+}
 async function me(){
   const {data:{session}}=await sb.auth.getSession();
   if(!session)return null;
   const {data}=await sb.from('profiles').select('*').eq('id',session.user.id).single();
   return data;
 }
-async function logout(){await sb.auth.signOut();location.href='index.html'}
+async function logout(){
+  clearApplicantAccess();
+  await sb.auth.signOut();
+  location.href='index.html';
+}
 function toast(msg,bad){
   let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t)}
   t.className=bad?'bad show':'show';t.textContent=msg;clearTimeout(t._h);t._h=setTimeout(()=>t.className='',5000);
 }
+function adminLoginButton(p){
+  return p && p.role==='admin' ? '<button class="btn ghost sm" onclick="location.href=\'admin.html\'">Dashboard</button>' : '<button class="btn ghost sm" onclick="openAdminLogin()">Admin login</button>';
+}
 function topbar(p,extra=''){
   return `<header class="topbar"><div class="brand"><span class="mark">W</span><div><b>Women's Growth Finance Ghana</b><small>Women's Growth Access Programme</small></div></div>
-  <div class="who">${extra}<span>${esc(p.full_name)}</span><button class="btn ghost sm" onclick="logout()">Sign out</button></div></header>`;
+  <div class="who">${extra}${adminLoginButton(p)}<span>${esc(p.full_name)}</span><button class="btn ghost sm" onclick="logout()">Sign out</button></div></header>`;
+}
+function adminLoginModalHTML(){
+  return `<div id="admin-login-modal" class="admin-login-modal" hidden>
+    <div class="admin-login-card">
+      <div class="admin-login-head"><h3>Admin login</h3><button type="button" class="btn ghost sm" onclick="closeAdminLogin()">Close</button></div>
+      <form id="admin-login-form" novalidate>
+        <div class="field"><label>Email</label><input id="adminEmail" type="email" autocomplete="username" required></div>
+        <div class="field"><label>Password</label><input id="adminPassword" type="password" autocomplete="current-password" required></div>
+        <div class="msg" id="adminLoginMsg"></div>
+        <button class="btn" type="submit" style="width:100%">Login as admin</button>
+      </form>
+    </div>
+  </div>`;
+}
+function ensureAdminLoginModal(){
+  if(document.getElementById('admin-login-modal'))return;
+  document.body.insertAdjacentHTML('beforeend',adminLoginModalHTML());
+  const form=$('#admin-login-form');
+  form.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const email=$('#adminEmail').value.trim();
+    const password=$('#adminPassword').value;
+    const msg=$('#adminLoginMsg');
+    msg.textContent='';
+    if(!email||!password){msg.textContent='Enter your email and password.';return;}
+    const {data,error}=await sb.auth.signInWithPassword({email,password});
+    if(error){msg.textContent=error.message;return;}
+    const profile=await me();
+    if(!profile||profile.role!=='admin'){msg.textContent='This account does not have admin access.';return;}
+    closeAdminLogin();
+    location.href='admin.html';
+  });
+}
+function openAdminLogin(){
+  ensureAdminLoginModal();
+  const modal=document.getElementById('admin-login-modal');
+  if(!modal) return;
+  modal.hidden=false;
+  modal.setAttribute('aria-hidden','false');
+  setTimeout(()=>{const field=document.getElementById('adminEmail'); if(field)field.focus();},50);
+}
+function closeAdminLogin(){
+  const modal=document.getElementById('admin-login-modal');
+  if(modal){
+    modal.hidden=true;
+    modal.setAttribute('aria-hidden','true');
+  }
+}
+async function ensureApplicantSession(fullName,phone){
+  const {email,password}=applicantCredentials(fullName,phone);
+  saveApplicantAccess({full_name:fullName,phone,email,password});
+  try{
+    const {data:up,error:upErr}=await sb.auth.signUp({email,password,options:{data:{full_name:fullName,phone}}});
+    if(upErr && !/already registered|already exists/i.test(upErr.message)) throw upErr;
+    if(up && up.session){return await me();}
+    const {data:inData,error:inErr}=await sb.auth.signInWithPassword({email,password});
+    if(inErr) throw inErr;
+    return await me();
+  }catch(err){
+    throw err;
+  }
+}
+async function restoreApplicantSession(){
+  const saved=loadApplicantAccess();
+  if(!saved||!saved.email||!saved.password) return null;
+  try{
+    const {data,error}=await sb.auth.signInWithPassword({email:saved.email,password:saved.password});
+    if(error) return null;
+    if(!data.session) return null;
+    return await me();
+  }catch{return null;}
 }
 
 /* ---------- form rendering ---------- */
